@@ -1,0 +1,231 @@
+#!/uufs/chpc.utah.edu/sys/installdir/snakemake/5.6.0/bin/snakemake -s
+# Snakefile.benchmark - snakemake snakefile for benchmarking RNAseq workflow.
+
+import os
+import sys
+import subprocess
+
+# Now specifying config file on command line. This lets us call workflow
+# from other directories, since we have to specify full path of configuration
+# file.
+#configfile: "config.yaml"
+
+# These rules should be executed on the host machine, not on the cluster:
+localrules: all_done, make_sampledata_file, clean, analysis_complete, raw_sample_qc, align_all_samples
+
+def RequiredModules():
+	"""
+	Returns list of required module names.
+	"""
+	return [ "samtools/1.5", 
+		"multiqc/1.5", 
+		"fastqc/0.11.4", 
+		"star/2.7.1a", 
+		"sra-toolkit/2.10.0",
+		"R/3.6.1",
+	]
+
+def Samples(config):
+	"""
+	Returns list of sample names from experiment config file.
+	"""
+	return list(config['samples'].keys())
+
+def SRRNumbers(config):
+	"""
+	Returns list of SRR numbers for all the samples in the configuration.
+	"""
+	return list(map(lambda x:config['samples'][x]['srrnumber'],Samples(config)))
+
+# The onstart handler runs code when the workflow starts. Using this to
+# perform "pre-flight checks".
+onstart:
+	try:
+		# Check for required software modules.
+		shell("module load "+" ".join(RequiredModules()))
+
+		shell("mkdir -p Alignments Samples")
+	except subprocess.CalledProcessError:
+		print("One or more required modules missing.")
+		sys.exit(1)
+	except FileNotFoundError as e:
+		print(e)
+		sys.exit(1)
+	else:
+		print("Pre-flight checks OK!")
+
+rule all_done:
+	input: "differential_expression_analysis.done", "summarized_qc.done"
+
+rule download_one_sample:
+	output: "Samples/{srr}_1.fastq", "Samples/{srr}_2.fastq"
+	benchmark:
+		"Benchmarks/download_one_sample/{srr}.tsv"
+	shell:
+		"""
+		module load sra-toolkit/2.10.0
+		cd Samples
+		fasterq-dump -p {wildcards.srr}
+		"""
+
+# This rule creates the genome index given the fasta file and gene annotation
+# file for the genome.
+rule index_genome:
+	input: fasta=config['genome_fasta'], gff=config['gene_annotation_file']
+	output: directory(config['genome_index'])
+	message: "Building genome index {output}."
+	benchmark:
+		"Benchmarks/index_genome/index_genome.tsv"
+	shell: """
+		module load star/2.7.1a
+		mkdir -p {output}
+		STAR --runMode genomeGenerate \
+			--runThreadN 5 \
+			--genomeDir {output} \
+			--genomeFastaFiles {input.fasta} \
+			--sjdbGTFfile {input.gff} \
+			--genomeSAindexNbases 10 \
+			--sjdbOverhang 100
+		"""
+
+rule download_annotation:
+	output: file=config['gene_annotation_file']
+	params: url=config['gene_annotation_url']
+	benchmark:
+		"Benchmarks/download_annotation/genome_annotation.tsv"
+	shell:
+		"""
+		cd Genome
+		wget {params.url}
+		gunzip `basename {params.url}`
+		"""
+
+rule download_genome:
+	output: config['genome_fasta']
+	params: url=config['genome_url']
+	benchmark:
+		"Benchmarks/download_genome/genome_genome.tsv"
+	shell:
+		"""
+		cd Genome
+		wget {params.url}
+		gunzip `basename {params.url}`
+		"""
+
+rule align_all_samples:
+	input: expand("Alignments/{srr}.{extension}", srr=SRRNumbers(config), extension=["bam","bam.bai","counts.txt"])
+	output: touch("all_samples_aligned.done")
+
+# This aligns each Fastq file against the genome index and renames the
+# resulting BAM file to {sample}.bam. This is tricky because the input
+# fastq file isn't named with the sample name, so we can't use regular
+# wildcard expansion.
+rule align_one_sample:
+	input: r1="Samples/{srr}_1.fastq", r2="Samples/{srr}_2.fastq", genome_index=config['genome_index'], gene_annotation=config['gene_annotation_file']
+	output: bam="Alignments/{srr}.bam", counts="Alignments/{srr}.counts.txt", bai="Alignments/{srr}.bam.bai"
+	message: "Aligning {input.r1} and {input.r2} to {input.genome_index}."
+	benchmark:
+		"Benchmarks/align_one_sample/{srr}.tsv"
+	shell: """
+		module load star/2.7.1a samtools/1.5
+		srr=`basename {input.r1} _1.fastq`
+		echo "Aligning {input.r1}, {input.r2}, sending output to {output.bam} and {output.counts}."
+		STAR --genomeDir {input.genome_index} \
+			--readFilesIn {input.r1} {input.r2} \
+			--runMode alignReads \
+			--quantMode GeneCounts \
+			--sjdbGTFfile {input.gene_annotation} \
+			--runThreadN 4 \
+			--clip3pAdapterSeq AGATCGGAAGAGCACACGTCTGAACTCCAGTCA \
+			--outSAMtype BAM SortedByCoordinate \
+			--limitBAMsortRAM 2000000000 \
+			--outFilterScoreMinOverLread 0 \
+			--outFilterMatchNminOverLread 0 \
+			--outFilterMismatchNmax 2 \
+			--outFileNamePrefix ./Alignments/$srr
+		# Rename the .bam file.
+		mv Alignments/{wildcards.srr}Aligned.sortedByCoord.out.bam {output.bam}
+		# Index the .bam file.
+		samtools index -b {output.bam} {output.bai}
+		# Rename the counts file.
+		mv Alignments/{wildcards.srr}ReadsPerGene.out.tab {output.counts}
+		# Clean up a little.
+		rm -rf Alignments/{wildcards.srr}_STARtmp Alignments/{wildcards.srr}_STARgenome Alignments/{wildcards.srr}Log.progress.out
+		"""
+
+# This rule builds the sampledata.txt file, which is input for the 
+# differential expression analysis, using information in the config file.
+rule make_sampledata_file:
+	#input: "config.yaml"
+	# The input is the config file. This variable is documented here:
+	# https://bitbucket.org/snakemake/snakemake/issues/594/retrieve-value-of-configfile-parameter-in
+	input: workflow.overwrite_configfile
+	output: filename="sampledata.txt"
+	message: "Making sample file {output.filename}."
+	run:
+		with open(output.filename,"w") as ofs:
+			# Write the table header.
+			ofs.write("\t".join(["Sample","Treatment","Time","SRRNumber"])+"\n")
+			# Write a row for each sample.
+			for sample in config['samples'].keys():
+				ofs.write("\t".join([sample,config['samples'][sample]['treatment'],config['samples'][sample]['time'],config['samples'][sample]['srrnumber']])+"\n")
+
+rule analysis_complete:
+	input: "deseq2_plots.pdf" ,"project_counts.txt", "project_results.txt"
+	output: touch("differential_expression_analysis.done")
+
+# This rule performs the differential expression analysis following alignment.
+rule differential_expression_analysis:
+	input: "all_samples_aligned.done", "sampledata.txt"
+	output: "deseq2_plots.pdf" ,"project_counts.txt", "project_results.txt"
+	params: basedir=workflow.basedir
+	message: "Performing differential expression analysis."
+	benchmark:
+		"Benchmarks/differential_expression_analysis/diff_expr_analysis.tsv"
+	shell: """
+		module load R/3.6.1
+		Rscript {params.basedir}/run_deseq2.r
+		"""
+
+# This rule generates the data quality summary.
+rule summarized_qc:
+	input: "raw_sample_qc.done", "all_samples_aligned.done"
+	output: touch("summarized_qc.done")
+	message: "Creating sample qc summary."
+	benchmark:
+		"Benchmarks/summarized_qc/summarized_qc.tsv"
+	shell: """
+		module load multiqc/1.5
+		multiqc .
+		"""
+
+# This rule runs FastQC on each sample's fastq file.
+rule qc_one_sample:
+	input: r1="Samples/{srr}_1.fastq", r2="Samples/{srr}_2.fastq"
+	output: "FastQC/{srr}_1_fastqc.html", "FastQC/{srr}_1_fastqc.zip", "FastQC/{srr}_2_fastqc.html", "FastQC/{srr}_2_fastqc.zip"
+	message: "Checking quality of raw fastq data {input.r1} and {input.r2}."
+	benchmark:
+		"Benchmarks/qc_one_sample/{srr}.tsv"
+	shell: """
+		module load fastqc/0.11.4
+		mkdir -p FastQC
+		fastqc -t 2 --noextract -o FastQC {input.r1} {input.r2}
+		"""
+
+# raw_sample_qc generates .done file when all sample_qc reports complete.
+rule raw_sample_qc:
+	input: expand(["FastQC/{srr}_{end}_fastqc.{format}"], end=["1","2"], srr=SRRNumbers(config), format=["html","zip"])
+	output: touch("raw_sample_qc.done")
+	message: "Confirming all fastq files qc'd."
+
+# This rule generates figures following the differential expression 
+# analysis.
+#rule figure_generation:
+#	input: "differential_expression_analysis.done"
+#	message: "Generating figures."
+#	output: touch("figure_generation.done")
+#
+
+# This rule cleans up the output from all the other rules.
+rule clean:
+	shell: "rm -rf Alignments Samples Genome Benchmarks Log.out FastQC deseq2_plots.pdf project_counts.txt project_results.txt sampledata.txt all_samples_aligned.done raw_sample_qc.done differential_expression_analysis.done summarized_qc.done multiqc_data* multiqc_report*.html"

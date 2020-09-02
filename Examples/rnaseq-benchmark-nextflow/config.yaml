@@ -1,0 +1,126 @@
+# config.yaml - configuration file for Snakefile.benchmark workflow.
+#
+# The RNAseq snakemake workflow requires the following input files:
+#
+# genome_fasta: single uncompressed fasta file containing genome sequence. 
+genome_url: ftp://ftp.ensembl.org/pub/release-98/fasta/saccharomyces_cerevisiae/dna/Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa.gz
+genome_fasta: Genome/Saccharomyces_cerevisiae.R64-1-1.dna.toplevel.fa
+#
+# gene_annotation_gff: name of GFF file with gene annotations.
+gene_annotation_url: ftp://ftp.ensembl.org/pub/release-98/gtf/saccharomyces_cerevisiae/Saccharomyces_cerevisiae.R64-1-1.98.gtf.gz
+gene_annotation_file: Genome/Saccharomyces_cerevisiae.R64-1-1.98.gtf
+
+# genome_index: full path name of directory that contains (or will contain)
+# the STAR index.
+genome_index: Genome/yeast/star100
+
+# description: text description of experiment
+description: >
+    GSE129319: UV laser-induced, time-resolved transcriptome resonses of Saccharomyces cerevisiae
+
+# Values for differential expression analysis:
+factorname: "Treatment"
+numerator: "laser"
+denominator: "control"
+
+# samples: associative array of sample information for experiment that is
+# indexed by sample name. Each entry contains the SRR number and 
+# experimental factor (YRR1 allele and carbon source).
+# Assuming for now data is single-ended, with single Fastq file per sample.
+samples:
+    Control_Time0_rep1:
+        treatment: control
+        time: "0"
+        srrnumber: SRR8847691
+    Control_Time0_rep2:
+        treatment: control
+        time: "0"
+        srrnumber: SRR8847692
+    Control_Time0_rep3:
+        treatment: control
+        time: "0"
+        srrnumber: SRR8847693
+    Control_Time15_rep1:
+        treatment: control
+        time: "15"
+        srrnumber: SRR8847694
+    Control_Time15_rep2:
+        treatment: control
+        time: "15"
+        srrnumber: SRR8847695
+    Control_Time15_rep3:
+        treatment: control
+        time: "15"
+        srrnumber: SRR8847696
+    Control_Time30_rep1:
+        treatment: control
+        time: "30"
+        srrnumber: SRR8847697
+    Control_Time30_rep2:
+        treatment: control
+        time: "30"
+        srrnumber: SRR8847698
+    Control_Time30_rep3:
+        treatment: control
+        time: "30"
+        srrnumber: SRR8847699
+    Control_Time60_rep1:
+        treatment: control
+        time: "60"
+        srrnumber: SRR8847700
+    Control_Time60_rep2:
+        treatment: control
+        time: "60"
+        srrnumber: SRR8847701
+    Control_Time60_rep3:
+        treatment: control
+        time: "60"
+        srrnumber: SRR8847702
+    Laser_Time0_rep1:
+        treatment: laser
+        time: "0"
+        srrnumber: SRR8847703
+    Laser_Time0_rep2:
+        treatment: laser
+        time: "0"
+        srrnumber: SRR8847704
+    Laser_Time0_rep3:
+        treatment: laser
+        time: "0"
+        srrnumber: SRR8847705
+    Laser_Time15_rep1:
+        treatment: laser
+        time: "15"
+        srrnumber: SRR8847706
+    Laser_Time15_rep2:
+        treatment: laser
+        time: "15"
+        srrnumber: SRR8847707
+    Laser_Time15_rep3:
+        treatment: laser
+        time: "15"
+        srrnumber: SRR8847708
+    Laser_Time30_rep1:
+        treatment: laser
+        time: "30"
+        srrnumber: SRR8847709
+    Laser_Time30_rep2:
+        treatment: laser
+        time: "30"
+        srrnumber: SRR8847710
+    Laser_Time30_rep3:
+        treatment: laser
+        time: "30"
+        srrnumber: SRR8847711
+    Laser_Time60_rep1:
+        treatment: laser
+        time: "60"
+        srrnumber: SRR8847712
+    Laser_Time60_rep2:
+        treatment: laser
+        time: "60"
+        srrnumber: SRR8847713
+    Laser_Time60_rep3:
+        treatment: laser
+        time: "60"
+        srrnumber: SRR8847714
