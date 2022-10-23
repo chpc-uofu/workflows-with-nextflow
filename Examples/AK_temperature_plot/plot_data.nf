@@ -14,6 +14,7 @@ location_channel = Channel.fromList(["Aleknagik_1_NNE","King_Salmon_42_SE","Fair
 
 /* data_url - constructs a URL to download data given the name of a location. */
 process data_url {
+	executor 'local'
 	input:
 		val location from location_channel
 	output:

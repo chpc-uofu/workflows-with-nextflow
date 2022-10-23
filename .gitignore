@@ -1,0 +1,8 @@
+*.swp
+.nfs*
+.nextflow*
+work
+Examples/AK_temperature_plot/*.txt
+Examples/AK_temperature_plot/*.png
+Examples/Compile/add_em_up
+Examples/Compile/*.o

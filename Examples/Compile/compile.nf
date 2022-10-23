@@ -5,7 +5,7 @@ vim: syntax=groovy
 */
 
 params.cflags="-c"
-params.lnflags="-o"
+params.lnflags="-g -o"
 params.executable_name="add_em_up"
 
 c_file_channel = Channel.fromPath("*.c")
@@ -23,17 +23,15 @@ process compile {
 }
 
 process link {
-	cache false
 	module 'gcc/8.3.0'
-	publishDir '.'
 	input:
 		file dot_o_files from o_file_channel.collect()
 	output:
-		file params.executable_name into result_channel
+		file params.executable_name into executable_channel
 	script:
 		"""
 		gcc ${params.lnflags} ${params.executable_name} ${dot_o_files}
 		"""
 }
 
-result_channel.subscribe { println "Compiled $it" }
+executable_channel.subscribe { println "Compiled $it" }
