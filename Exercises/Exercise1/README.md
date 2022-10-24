@@ -13,7 +13,7 @@ wget https://ftp.ncbi.nih.gov/blast/db/FASTA/pdbaa.gz
 
 2. Uncompress the data:
 ```bash
-gunzip pdbaa
+gunzip pdbaa.gz
 ```
 
 3. Format the raw data into a BLAST database:
