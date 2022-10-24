@@ -38,13 +38,7 @@ process format {
 	input:
 		file input_filename from dbinput_channel
 	output:
-		file 'pdbaa.pdb' into pdb_channel
-		file 'pdbaa.phr' into phr_channel
-		file 'pdbaa.pin' into pin_channel
-		file 'pdbaa.pot' into pot_channel
-		file 'pdbaa.psq' into psq_channel
-		file 'pdbaa.ptf' into ptf_channel
-		file 'pdbaa.pto' into pto_channel
+		file "${params.dbname}.*" into output_file_channel
 		stdout into result_channel
 	script:
 		"""
