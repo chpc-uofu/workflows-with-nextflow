@@ -7,23 +7,31 @@ sequence data and format it into a blast-able database.
 The steps are:
 
 1. Download the amino acid sequence data file:
+```bash
 wget https://ftp.ncbi.nih.gov/blast/db/FASTA/pdbaa.gz
+```
 
 2. Uncompress the data:
+```bash
 gunzip pdbaa
+```
 
 3. Format the raw data into a BLAST database:
+```bash
 module load blast
 makeblastdb -in pdbaa -input_type fasta -dbtype prot -out pdbaa
+```
 
 Files created will be:
-	pdbaa.pdb
-	pdbaa.phr
-	pdbaa.pin
-	pdbaa.pot
-	pdbaa.psq
-	pdbaa.ptf
-	pdbaa.pto
+```bash
+pdbaa.pdb
+pdbaa.phr
+pdbaa.pin
+pdbaa.pot
+pdbaa.psq
+pdbaa.ptf
+pdbaa.pto
+```
 
 Write a workflow with three processes that download, uncompress, and format
 the database following the steps described above. The output from the
