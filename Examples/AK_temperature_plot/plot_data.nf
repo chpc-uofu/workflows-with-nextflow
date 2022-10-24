@@ -50,7 +50,7 @@ process download_headers {
 /* plot_data - creates plot of daily temperature data given a header file and some location data files. */
 process plot_data {
 	publishDir '.'
-	module 'R/4.0.2'
+	module 'R'
 	input:
 		file header_file from headers_channel
 		file data_files from data_channel.collect()
